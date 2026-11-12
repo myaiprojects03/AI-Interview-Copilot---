@@ -21,8 +21,8 @@ There are two ways to put it live:
 - **Free on Vercel** (section V): no card needed. The backend runs as a Docker container that
   Vercel scales to several instances by itself. Vercel's free (Hobby) plan is for non-commercial use;
   a paid launch needs Vercel Pro (about $20/month).
-- **On any server** (sections 1-3): the full stack with `docker-compose.prod.yml`, about $5/month
-  for a small server. (`render.yaml` also describes a Render setup; Render asks for a card, even for
+- **On any server** (sections 1-3): the full stack with `docker-compose.prod.yml`, about $8-12/month
+  for a server with 2 GB of memory. (`render.yaml` also describes a Render setup; Render asks for a card, even for
   its free plan.)
 
 ## V. Free on Vercel (no card)

@@ -7,7 +7,7 @@ close code 4401.
 
 Protocol (client -> server):
   text  {"type": "start", "session_type": "behavioral|technical|mixed", "sample_rate": 16000,
-         "cv_id": "<uuid or null>", "jd_id": "<uuid or null>",   (no cv_id = sample CV)
+         "cv_id": "<uuid or null>", "jd_id": "<uuid or null>",   (no cv_id = built-in sample CV, development only)
          "resume": "<session_id>"}   optional: after a dropped connection, continue that interview
                                      (same history record) if it ended less than 2 minutes ago
   bytes first byte = channel (0 = interviewer/tab, 1 = candidate/mic), rest = PCM16 LE mono

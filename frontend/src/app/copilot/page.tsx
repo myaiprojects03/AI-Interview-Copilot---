@@ -52,8 +52,10 @@ export default function CopilotPage() {
   const [focus, setFocus] = useState(false);
   const [usage, setUsage] = useState<Usage | null>(null);
   const setupRef = useRef<SetupChoice>({ cvId: null, jdId: null, sessionType: "mixed" });
+  const [hasCv, setHasCv] = useState(false);
   const onSetupChange = useCallback((c: SetupChoice) => {
     setupRef.current = c;
+    setHasCv(!!c.cvId);
   }, []);
 
   const live = s.status === "live";
@@ -98,11 +100,13 @@ export default function CopilotPage() {
           <>
             <SessionSetup onChange={onSetupChange} />
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <Button size="lg" onClick={() => s.start(setupRef.current)} disabled={limitHit}>
+              <Button size="lg" onClick={() => s.start(setupRef.current)} disabled={limitHit || !hasCv}>
                 Start interview
               </Button>
               <p className="text-sm text-muted">
-                Pick your meeting tab when asked and turn on &ldquo;Share tab audio&rdquo;.
+                {hasCv
+                  ? <>Pick your meeting tab when asked and turn on &ldquo;Share tab audio&rdquo;.</>
+                  : "Upload your CV to start. Answers are written only from it."}
               </p>
               {usage && (
                 <p className="text-sm text-muted sm:ml-auto">

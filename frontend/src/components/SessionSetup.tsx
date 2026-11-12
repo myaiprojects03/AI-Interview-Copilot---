@@ -11,6 +11,8 @@ export type SetupChoice = { cvId: string | null; jdId: string | null; sessionTyp
 const STORAGE_KEY = "copilot.setup";
 
 // Remembering the last choice is a per-browser convenience only; the server stays the source of truth.
+const JD_NONE_KEY = "copilot.jdNone"; // set when the user picks "None" for the job description on purpose
+
 function loadSaved(): SetupChoice {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -19,6 +21,23 @@ function loadSaved(): SetupChoice {
     /* storage unavailable */
   }
   return { cvId: null, jdId: null, sessionType: "mixed" };
+}
+
+function jdNoneChosen(): boolean {
+  try {
+    return localStorage.getItem(JD_NONE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setJdNoneChosen(none: boolean) {
+  try {
+    if (none) localStorage.setItem(JD_NONE_KEY, "1");
+    else localStorage.removeItem(JD_NONE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function save(choice: SetupChoice) {
@@ -54,14 +73,17 @@ export function SessionSetup({ onChange }: { onChange: (c: SetupChoice) => void 
       setError(null);
       const saved = { ...loadSaved(), ...prefer };
       const exists = (id: string | null, kind: DocKind) => !!id && list.some((d) => d.id === id && d.kind === kind);
+      // The list is newest first. Without a valid earlier choice, use the newest CV, and the newest job
+      // description unless "None" was chosen on purpose.
+      const newest = (kind: DocKind) => list.find((d) => d.kind === kind)?.id ?? null;
       update({
         sessionType: saved.sessionType,
-        cvId: exists(saved.cvId, "cv") ? saved.cvId : null,
-        jdId: exists(saved.jdId, "jd") ? saved.jdId : null,
+        cvId: exists(saved.cvId, "cv") ? saved.cvId : newest("cv"),
+        jdId: exists(saved.jdId, "jd") ? saved.jdId : (jdNoneChosen() ? null : newest("jd")),
       });
     } catch (e) {
       setError(onError(e));
-      update({ ...loadSaved(), cvId: null, jdId: null });
+      update({ sessionType: loadSaved().sessionType, cvId: null, jdId: null });
     }
   }, [api, token, onError, update]);
 
@@ -87,6 +109,7 @@ export function SessionSetup({ onChange }: { onChange: (c: SetupChoice) => void 
     if (!file) return;
     await run(`Reading ${file.name}...`, async () => {
       const doc = await api.uploadDocument(kind, file);
+      if (kind === "jd") setJdNoneChosen(false);
       await refresh(kind === "cv" ? { ...choice, cvId: doc.id } : { ...choice, jdId: doc.id });
     });
   };
@@ -94,6 +117,7 @@ export function SessionSetup({ onChange }: { onChange: (c: SetupChoice) => void 
   const onSaveJd = () =>
     run("Saving job description...", async () => {
       const doc = await api.saveText("jd", jdDraft);
+      setJdNoneChosen(false);
       setJdDraft("");
       setShowJdBox(false);
       await refresh({ ...choice, jdId: doc.id });
@@ -116,9 +140,9 @@ export function SessionSetup({ onChange }: { onChange: (c: SetupChoice) => void 
       <div className="grid gap-4 md:grid-cols-[1.2fr_1.2fr_0.8fr]">
         <Label htmlFor="cv-select">
           Your CV
-          <Select id="cv-select" value={choice.cvId ?? ""}
+          <Select id="cv-select" value={choice.cvId ?? ""} disabled={cvs.length === 0}
                   onChange={(e) => update({ ...choice, cvId: e.target.value || null })}>
-            <option value="">Sample CV (for testing)</option>
+            {cvs.length === 0 && <option value="">No CV yet: upload one to start</option>}
             {cvs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
           </Select>
           <span className="flex gap-4 font-normal">
@@ -132,12 +156,15 @@ export function SessionSetup({ onChange }: { onChange: (c: SetupChoice) => void 
             )}
           </span>
         </Label>
-        <input ref={cvInput} type="file" accept=".pdf,.docx,.txt" hidden onChange={onUpload("cv")} />
+        <input ref={cvInput} type="file" accept=".pdf,.docx,.txt,.md" hidden onChange={onUpload("cv")} />
 
         <Label htmlFor="jd-select">
           Job description
           <Select id="jd-select" value={choice.jdId ?? ""}
-                  onChange={(e) => update({ ...choice, jdId: e.target.value || null })}>
+                  onChange={(e) => {
+                    setJdNoneChosen(!e.target.value);
+                    update({ ...choice, jdId: e.target.value || null });
+                  }}>
             <option value="">None</option>
             {jds.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
           </Select>
@@ -151,7 +178,7 @@ export function SessionSetup({ onChange }: { onChange: (c: SetupChoice) => void 
             )}
           </span>
         </Label>
-        <input ref={jdInput} type="file" accept=".pdf,.docx,.txt" hidden onChange={onUpload("jd")} />
+        <input ref={jdInput} type="file" accept=".pdf,.docx,.txt,.md" hidden onChange={onUpload("jd")} />
 
         <Label htmlFor="type-select">
           Interview type

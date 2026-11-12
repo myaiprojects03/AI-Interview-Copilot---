@@ -428,8 +428,15 @@ class CopilotSession:
         A chosen CV that cannot be loaded is fatal: silently answering from the sample CV in a
         real interview would be worse than not starting."""
         self.session_type = session_type if session_type in ("behavioral", "technical", "mixed") else "mixed"
-        if not cv_id and not jd_id:
-            return "Sample CV", None
+        if not cv_id:
+            # The built-in sample CV is for local development and tests only. A real user must answer
+            # from their own CV, so a live server refuses to start without one.
+            if get_settings().app_env != "development":
+                await self.send({"type": "error", "message": "Choose your CV before starting. "
+                                                             "Upload one on the Dashboard or above."})
+                return None
+            if not jd_id:
+                return "Sample CV", None
         repo = self.services.documents
         if repo is None:
             await self.send({"type": "error", "message": "Database is not available, so your CV cannot be "

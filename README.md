@@ -6,6 +6,9 @@ CV and the job description, in about two seconds.
 
 It works with any interview that runs in Chrome or Edge (Google Meet, Zoom, Teams in the browser).
 
+**Live demo:** https://ai-interview-copilot-app-eight.vercel.app
+(API health check: https://ai-interview-copilot-api.vercel.app/health)
+
 ## Features
 
 - **Audio capture:** the interview tab's audio and the candidate's microphone, captured in the browser.

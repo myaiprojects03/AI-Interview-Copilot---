@@ -71,3 +71,17 @@ def test_providers_registered_and_require_keys():
 def test_unregistered_provider_fails_clearly():
     with pytest.raises(RuntimeError, match="not registered"):
         get_stt(Settings(stt_provider="does-not-exist"))
+
+
+def test_sample_cv_is_for_development_only(monkeypatch):
+    """A live server never answers from the built-in sample CV: starting without a CV is refused."""
+    from app.config import get_settings
+    fake = FakeSTT({"interviewer": []})
+    monkeypatch.setattr(copilot_session, "get_stt", lambda s: fake)
+    monkeypatch.setattr(copilot_session, "get_llm", lambda s: FakeLLM())
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    with TestClient(app).websocket_connect("/ws/session") as ws:
+        ws.send_json({"type": "start", "sample_rate": 16000})
+        msg = ws.receive_json()
+        assert msg["type"] == "error" and "Choose your CV" in msg["message"]
+    assert fake.streams == {}  # nothing was opened or recorded
