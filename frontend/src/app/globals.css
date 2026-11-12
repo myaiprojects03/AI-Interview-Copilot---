@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-ink text-text font-sans antialiased;
+    font-feature-settings: "kern";
+  }
+  :focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--c-accent);
+    color: var(--c-accentInk);
+  }
+}
+
+@layer components {
+  /* The highlighter: key lines of an answer are marked like a highlighted cue card. */
+  .highlight {
+    background-image: linear-gradient(transparent 58%, color-mix(in srgb, var(--c-accent) 75%, transparent) 58%);
+    padding: 0 0.1em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  /* Only the opening line is highlighted; bold labels inside the bullets (Situation, Task...) stay plain,
+     so the highlight keeps pointing at the one line to say first. */
+  .answer li .highlight {
+    background-image: none;
+    padding: 0;
+  }
+  .kbd {
+    @apply inline-flex min-w-[1.5rem] items-center justify-center rounded-[5px] border border-line px-1.5 text-xs text-muted;
+  }
+}
+
+/* One orchestrated moment: the demo answer on the landing page writes itself in, line by line. */
+@keyframes write-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.write-in {
+  animation: write-in 420ms ease-out both;
+}
+@keyframes tally {
+  50% {
+    opacity: 0.35;
+  }
+}
+.tally {
+  animation: tally 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .write-in,
+  .tally {
+    animation: none;
+  }
+}

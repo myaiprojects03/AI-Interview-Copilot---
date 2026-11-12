@@ -1,0 +1,88 @@
+# Production stack: Caddy (HTTPS + load balancer) -> N frontend and N backend containers,
+# with Postgres and Redis. Settings come from the project-root .env (see .env.example,
+# section "Production deployment").
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml up -d --scale backend=3 --scale frontend=2
+name: interview-copilot-prod
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      - "8080:8080"   # local test address of the app (APP_ADDRESS default)
+      - "8000:8000"   # local test address of the API (API_ADDRESS default)
+    environment:
+      APP_ADDRESS: ${APP_ADDRESS:-:8080}
+      API_ADDRESS: ${API_ADDRESS:-:8000}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [frontend, backend]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    environment:
+      NEXTAUTH_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env}
+      BACKEND_URL: http://backend:8000
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?set INTERNAL_API_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    deploy:
+      replicas: 2
+    depends_on: [backend]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: production
+      FRONTEND_ORIGIN: ${PUBLIC_APP_URL:-http://localhost:8080}
+      DATABASE_URL: postgresql://copilot:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/copilot
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    deploy:
+      replicas: 2
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: copilot
+    volumes: [pgdata_prod:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    # Only short-lived state (rate limits, 30-second tickets): nothing to persist.
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb",
+              "--maxmemory-policy", "volatile-ttl"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata_prod:
+  caddy_data:
+  caddy_config:

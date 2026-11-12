@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    # Real Postgres, Redis and stripe-mock, so the database, shared-state and Stripe-client tests run too
+    # (no Stripe account needed).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: copilot
+          POSTGRES_PASSWORD: copilot
+          POSTGRES_DB: copilot
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U copilot" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+      stripe-mock:
+        image: stripe/stripe-mock:v0.206.0
+        ports: ["12111:12111"]
+    env:
+      TEST_DATABASE_URL: postgresql://copilot:copilot@localhost:5432/copilot
+      TEST_REDIS_URL: redis://localhost:6379/0
+      STRIPE_MOCK_URL: http://localhost:12111
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: mypy app scripts
+      - run: pytest -q
+      - run: pip-audit -r requirements.txt   # known vulnerabilities in runtime dependencies
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm audit --omit=dev
+      - run: npm run lint
+      - run: npm run build
+
+  # Builds both production images and starts the full stack (2 backends, 2 frontends, Postgres,
+  # Redis, Caddy load balancer), then checks the app answers through the load balancer.
+  docker:
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-jwt-secret-that-is-long-enough-0123456789
+      NEXTAUTH_SECRET: ci-nextauth-secret-0123456789
+      INTERNAL_API_SECRET: ci-internal-secret-0123456789
+      POSTGRES_PASSWORD: ci-postgres-password
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose -f docker-compose.prod.yml up -d --build --wait --wait-timeout 300
+      - run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors http://localhost:8000/health
+      - run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors -o /dev/null http://localhost:8080/login
+      - run: docker compose -f docker-compose.prod.yml ps
+      - if: failure()
+        run: docker compose -f docker-compose.prod.yml logs --tail 100
+

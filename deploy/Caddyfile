@@ -1,0 +1,35 @@
+# Load balancer and HTTPS for the production stack (docker-compose.prod.yml).
+#
+# APP_ADDRESS / API_ADDRESS are the public addresses. With real domain names
+# (app.example.com, api.example.com) Caddy gets and renews HTTPS certificates by itself.
+# Locally they default to http://localhost:8080 (app) and http://localhost:8000 (API).
+{
+	admin off
+}
+
+{$APP_ADDRESS::8080} {
+	encode zstd gzip
+	reverse_proxy {
+		# Every running frontend container (docker compose --scale frontend=N).
+		dynamic a frontend 3000 {
+			refresh 5s
+		}
+		lb_policy round_robin
+		lb_try_duration 5s
+		fail_duration 30s
+	}
+}
+
+{$API_ADDRESS::8000} {
+	reverse_proxy {
+		# Every running backend container (docker compose --scale backend=N).
+		dynamic a backend 8000 {
+			refresh 5s
+		}
+		# Live interviews are long WebSocket connections: send each new one to the least busy
+		# instance. Any instance can serve any request (shared state is in Redis and Postgres).
+		lb_policy least_conn
+		lb_try_duration 5s
+		fail_duration 30s
+	}
+}

@@ -1,0 +1,25 @@
+Daniel Reyes
+Business Analyst | Boston, MA | daniel.reyes@example.com
+Summary
+Industrial engineer turned business analyst with 4 years of experience in operations, supplier strategy and data-driven decision making. Combines analytical work with stakeholder management; motivated to move into strategy consulting.
+Experience
+Operations Analyst — Northwind Energy (2022 – present)
+When our main generator supplier could not meet capacity or budget for a new plant department, built a long-list of 40 alternative suppliers, ran a scoring model on cost, lead time and quality, and negotiated with the top 3; the chosen supplier cut project cost by 12%.
+Persuaded the plant director to delay a $2M equipment purchase by presenting a 6-month utilisation analysis showing existing machines ran at 55% capacity; the purchase was postponed and the budget moved to maintenance.
+Introduced a weekly KPI dashboard used by 25 managers, replacing 4 separate spreadsheets.
+Supply Chain Intern — Halden Robotics (Summer 2021)
+During a component shortage, mapped 120 critical parts to backup suppliers and set up a shortage early-warning sheet that the team kept using after the internship.
+Worked with engineering and finance to agree on one stock-level policy for robot spare parts.
+Consulting Intern — Clearpoint Partners (Summer 2020)
+Supported a market-entry study for a logistics client; built the customer survey and presented findings to the client's leadership team.
+Leadership
+President, University Consulting Club (2019 – 2020): grew membership from 30 to 85 and organised 6 pro-bono projects with local non-profits.
+When two project leads disagreed on scope, set up a joint session, agreed on clear deliverables, and both projects finished on time.
+Education
+BSc Industrial Engineering — Riverside Technical University (2021)
+Skills
+Analytics | Excel, SQL, Python (pandas), Power BI
+Business | Supplier negotiation, cost modelling, stakeholder management
+Languages | English, Spanish
+Goals
+Long term, I want to use consulting experience to help energy and education organisations operate more efficiently.

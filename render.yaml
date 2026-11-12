@@ -1,0 +1,66 @@
+# Render Blueprint: the free live demo. One instance of each service (Render's free plan
+# cannot scale). For production with several instances, see DEPLOY.md (docker-compose.prod.yml).
+#
+# Database: Neon (free, does not expire) - paste its connection string as DATABASE_URL.
+# Values marked "sync: false" are asked for when the Blueprint is created. See DEPLOY.md, "Render".
+services:
+  - type: web
+    name: interview-copilot-api
+    runtime: docker
+    plan: free
+    region: virginia            # near Neon/Pinecone us-east-1 and Groq
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: FRONTEND_ORIGIN    # the app's address, e.g. https://interview-copilot-app.onrender.com
+        sync: false
+      - key: DATABASE_URL       # Neon connection string
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: interview-copilot-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: INTERNAL_API_SECRET
+        generateValue: true
+      - key: ASSEMBLYAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+
+  - type: web
+    name: interview-copilot-app
+    runtime: docker
+    plan: free
+    region: virginia
+    rootDir: frontend
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /login
+    envVars:
+      - key: NEXT_PUBLIC_API_URL  # the API's address, e.g. https://interview-copilot-api.onrender.com
+        sync: false
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: INTERNAL_API_SECRET
+        fromService:
+          type: web
+          name: interview-copilot-api
+          envVarKey: INTERNAL_API_SECRET
+
+  - type: keyvalue
+    name: interview-copilot-redis
+    plan: free
+    region: virginia
+    ipAllowList: []             # reachable only from the services above
+    maxmemoryPolicy: volatile-ttl

@@ -1,0 +1,28 @@
+# Secrets: never commit (templates are .env.example)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Server backups (deploy/backup.sh)
+backups/
+
+# Editors, OS, logs
+.vscode/
+.idea/
+.DS_Store
+*.log
