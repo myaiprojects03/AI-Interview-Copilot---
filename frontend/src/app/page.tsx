@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { Wordmark } from "@/components/AppShell";
 import { Button, LinkButton } from "@/components/ui/Button";
@@ -201,6 +202,10 @@ export default async function Home() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-muted sm:px-6">
           <span>© {new Date().getFullYear()} {brand.appName}</span>
           <span>Answers come from your CV. Always check them before you speak.</span>
+          <nav aria-label="Legal" className="flex gap-4">
+            <Link href="/privacy" className="hover:text-text">Privacy</Link>
+            <Link href="/terms" className="hover:text-text">Terms</Link>
+          </nav>
         </div>
       </footer>
     </div>

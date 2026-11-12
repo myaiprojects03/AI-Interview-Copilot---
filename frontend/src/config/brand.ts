@@ -6,6 +6,8 @@ export const brand = {
   description:
     "Interview Copilot listens to your video interview, catches each question and puts a short answer " +
     "built from your CV on screen, in about two seconds.",
+  // Shown on the Privacy and Terms pages for questions about data. Leave empty to omit.
+  contactEmail: "",
   colors: {
     ink: "#0F1729",        // workspace background
     panel: "#172036",      // panels and inputs

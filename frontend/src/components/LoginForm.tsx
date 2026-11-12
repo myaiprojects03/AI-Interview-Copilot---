@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -88,6 +89,13 @@ function Form({ googleEnabled }: { googleEnabled: boolean }) {
             <Button type="submit" size="lg" disabled={busy}>
               {busy ? "Please wait..." : register ? "Create account" : "Sign in"}
             </Button>
+            {register && (
+              <p className="text-xs text-muted">
+                By creating an account you agree to the{" "}
+                <Link href="/terms" className="underline underline-offset-4 hover:text-text">Terms</Link> and{" "}
+                <Link href="/privacy" className="underline underline-offset-4 hover:text-text">Privacy</Link> pages.
+              </p>
+            )}
           </form>
 
           <p className="mt-6 text-sm text-muted">

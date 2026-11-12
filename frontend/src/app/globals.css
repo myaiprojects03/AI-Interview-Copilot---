@@ -35,6 +35,19 @@
     background-image: none;
     padding: 0;
   }
+  /* Privacy and Terms pages */
+  .legal h2 {
+    @apply mt-4 text-lg font-bold text-text;
+  }
+  .legal ul {
+    @apply flex list-disc flex-col gap-2 pl-5 text-muted;
+  }
+  .legal p {
+    @apply text-muted;
+  }
+  .legal strong {
+    @apply text-text;
+  }
   .kbd {
     @apply inline-flex min-w-[1.5rem] items-center justify-center rounded-[5px] border border-line px-1.5 text-xs text-muted;
   }
