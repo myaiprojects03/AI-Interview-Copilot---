@@ -36,7 +36,7 @@ def test_docx_paragraphs_and_tables_extracted():
     ("cv.pdf", b"not a pdf at all" * 10, "could not be read"),
     ("cv.docx", b"not a docx" * 10, "could not be read"),
     ("cv.txt", b"too short", "Almost no text"),
-    ("cv.txt", b"a" * (5 * 1024 * 1024 + 1), "larger than 5 MB"),
+    ("cv.txt", b"a" * (4 * 1024 * 1024 + 1), "larger than 4 MB"),
 ])
 def test_bad_files_give_clear_errors(name, data, needle):
     with pytest.raises(ParseError, match=needle):

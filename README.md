@@ -89,10 +89,10 @@ frontend/                Next.js (TypeScript, Tailwind)
   src/config/brand.ts    branding: name, text, colours
 deploy/                  load balancer config and server scripts
 docs/TECHNICAL.md        how it is built: providers, reliability, security, payments
-DEPLOY.md                putting it live (free demo or production server), operations, backups
+DEPLOY.md                putting it live (Vercel or a server), operations, backups
 docker-compose.yml       local database and Redis
 docker-compose.prod.yml  production stack
-render.yaml              free live demo on Render
+render.yaml              Render setup (Render requires a card)
 ```
 
 ## Tests and checks
@@ -109,7 +109,7 @@ The same checks, plus a build and start of the full production stack, run on Git
 
 ## Putting it live
 
-See [DEPLOY.md](DEPLOY.md): a free demo on Render, or the full multi-instance setup on any server.
+See [DEPLOY.md](DEPLOY.md): free on Vercel (no card), or the full multi-instance setup on any server.
 
 ## Customising
 

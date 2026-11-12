@@ -46,6 +46,7 @@ REPLACE_WINDOW_S = 10           # a narrowed follow-up in the same turn replaces
 METER_INTERVAL_S = 15           # how often usage is recorded and the plan limit checked
 LIMIT_WARNING_S = 120           # warn when this much time is left on the plan
 REGENERATE_MIN_INTERVAL_S = 1.0 # ignore repeated Regenerate presses faster than this (protects the LLM quota)
+ROTATE_QUIET_S = 2.5            # "quiet": nobody has spoken for this long and no answer is being written
 RESUME_WINDOW_S = 120           # a dropped connection can resume the same interview within this time
 STT_RETRY_DELAYS_S = (1, 2, 4)  # reconnect attempts after the transcription service drops
 STT_STABLE_S = 30               # a stream that ran this long resets the attempt count
@@ -123,6 +124,9 @@ class CopilotSession:
         self.last_partial_check = 0.0
         self.current: Question | None = None
         self.answer_task: asyncio.Task | None = None
+        self.detecting = False
+        self.last_speech = time.monotonic()
+        self.rotate_task: asyncio.Task | None = None
         self.last_regenerate = 0.0
         self.detector_task: asyncio.Task | None = None
 
@@ -142,6 +146,7 @@ class CopilotSession:
 
     # ---------- transcription ----------
     async def _on_event(self, ev) -> None:
+        self.last_speech = time.monotonic()
         await self.send({"type": "transcript", "speaker": ev.speaker, "text": ev.text,
                          "is_final": ev.is_final, "end_of_turn": ev.speech_final})
         if ev.is_final:
@@ -228,7 +233,9 @@ class CopilotSession:
     async def _detector(self) -> None:
         assert self.llm is not None
         while True:
+            self.detecting = False
             text, t0, context, turn = await self.turns.get()
+            self.detecting = True
             # Retrieval runs at the same time as detection, on the turn text, so it adds no
             # latency in the common case.
             retrieving = (asyncio.create_task(self._retrieve(text))
@@ -370,6 +377,22 @@ class CopilotSession:
         if self.limit_s is None:
             return None
         return max(0, int(self.limit_s - self.used_before_s - self.session_s))
+
+    def _quiet(self) -> bool:
+        answering = self.answer_task is not None and not self.answer_task.done()
+        return (not answering and not self.detecting and self.turns.empty()
+                and time.monotonic() - self.last_speech >= ROTATE_QUIET_S)
+
+    async def _rotator(self, after_s: int) -> None:
+        """Some hosts close a connection after a fixed time (Vercel: 300 s). Before that happens,
+        at a moment when nobody is speaking and no answer is being written, ask the browser to
+        open a fresh connection; it switches over before closing this one, so nothing is lost."""
+        await asyncio.sleep(after_s)
+        # Polling, not an Event: "quiet" means nothing happened for a while, which no single event marks.
+        while not self._quiet():  # noqa: ASYNC110
+            await asyncio.sleep(0.5)
+        log.info("session %s: asking the browser to switch to a fresh connection", self.session_id)
+        await self.send({"type": "rotate"})
 
     async def _meter(self) -> None:
         """Records time used and enforces the plan limit on the server (the browser cannot skip it)."""
@@ -526,6 +549,8 @@ class CopilotSession:
         for speaker in opened:
             self.tasks.append(asyncio.create_task(self._transcribe(speaker, self.streams[speaker])))
         self.meter_task = asyncio.create_task(self._meter())
+        if settings.session_rotate_s > 0:
+            self.rotate_task = asyncio.create_task(self._rotator(settings.session_rotate_s))
         if self.llm is not None:
             self.detector_task = asyncio.create_task(self._detector())
         await self.send({"type": "ready", "channels": opened, "answers": self.llm is not None,
@@ -545,7 +570,7 @@ class CopilotSession:
         # The finally block guarantees resources are released even if this cleanup is itself
         # cancelled (e.g. an abrupt client disconnect).
         self.closing = True
-        for task in (self.detector_task, self.meter_task):
+        for task in (self.detector_task, self.meter_task, self.rotate_task):
             if task:
                 task.cancel()
         self.stop_answer()

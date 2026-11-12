@@ -13,7 +13,7 @@ from docx.table import Table as DocxTable
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024  # under Vercel's 4.5 MB request limit
 MAX_TEXT_CHARS = 30_000   # ~7.5k tokens; longer documents are truncated
 MIN_TEXT_CHARS = 50
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
@@ -69,7 +69,7 @@ def extract_text(filename: str, data: bytes) -> str:
     if ext not in ALLOWED_EXTENSIONS:
         raise ParseError("Unsupported file type. Upload a PDF, DOCX or TXT file.")
     if len(data) > MAX_UPLOAD_BYTES:
-        raise ParseError("File is larger than 5 MB.")
+        raise ParseError("File is larger than 4 MB.")
     if ext == ".pdf":
         raw = _pdf_text(data)
     elif ext == ".docx":

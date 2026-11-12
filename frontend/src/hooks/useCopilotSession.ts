@@ -60,6 +60,7 @@ export function useCopilotSession(token: string | undefined) {
   const attemptRef = useRef(0);
   const retryTimer = useRef<number | null>(null);
   const infoTimer = useRef<number | null>(null);
+  const handoverRef = useRef(false); // switching to a fresh connection (see "rotate")
 
   const updateQa = useCallback((id: string, fn: (qa: QA) => QA) => {
     setQas((prev) => prev.map((qa) => (qa.id === id ? fn(qa) : qa)));
@@ -67,6 +68,7 @@ export function useCopilotSession(token: string | undefined) {
 
   const end = useCallback(() => {
     activeRef.current = false;
+    handoverRef.current = false;
     if (retryTimer.current !== null) window.clearTimeout(retryTimer.current);
     retryTimer.current = null;
     readyRef.current = false;
@@ -114,8 +116,10 @@ export function useCopilotSession(token: string | undefined) {
   // Assigned below: connect and reconnect call each other.
   const reconnectRef = useRef<() => void>(() => undefined);
 
+  /** Open the live-session connection. With `handover`, the current connection keeps carrying audio
+   *  until the new one is ready; then it is closed (used when the server asks to "rotate"). */
   const connect = useCallback(
-    async (resume: string | null) => {
+    async (resume: string | null, handover = false) => {
       const setup = setupRef.current;
       const capture = captureRef.current;
       if (!setup || !capture || !activeRef.current) return;
@@ -124,7 +128,8 @@ export function useCopilotSession(token: string | undefined) {
       if (!activeRef.current) return;
       const ws = new WebSocket(`${WS_URL}?ticket=${encodeURIComponent(ticket)}`);
       ws.binaryType = "arraybuffer";
-      wsRef.current = ws;
+      let socketReady = false;
+      if (!handover) wsRef.current = ws;
 
       ws.onopen = () =>
         ws.send(JSON.stringify({
@@ -137,8 +142,24 @@ export function useCopilotSession(token: string | undefined) {
         }));
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data as string);
+        if (handover && !socketReady && msg.type !== "ready") {
+          // The fresh connection failed before it was ready: keep using the current one.
+          if (msg.type === "error") ws.close();
+          return;
+        }
         switch (msg.type) {
           case "ready":
+            socketReady = true;
+            if (handover) {
+              // Switch audio to the fresh connection, then close the old one: no gap, no notice.
+              const old = wsRef.current;
+              wsRef.current = ws;
+              handoverRef.current = false;
+              if (old && old.readyState === WebSocket.OPEN) {
+                old.send(JSON.stringify({ type: "end" }));
+                old.close();
+              }
+            }
             readyRef.current = true;
             attemptRef.current = 0;
             setUsing({ cv: msg.cv, jd: msg.jd, type: setup.sessionType });
@@ -146,7 +167,7 @@ export function useCopilotSession(token: string | undefined) {
             sessionIdRef.current = msg.session_id ?? null;
             setSessionId(msg.session_id ?? null);
             setStatus("live");
-            if (resume) {
+            if (resume && !handover) {
               showInfo(msg.resumed
                 ? "Reconnected. Words spoken while offline were not captured."
                 : "Reconnected. Continuing as a new interview in your history.");
@@ -186,6 +207,16 @@ export function useCopilotSession(token: string | undefined) {
           case "usage":
             setRemaining(msg.remaining_seconds ?? null);
             break;
+          case "rotate":
+            // The host will soon close this connection (e.g. Vercel after 5 minutes); the server
+            // picked a quiet moment to switch to a fresh one.
+            if (!handoverRef.current && wsRef.current === ws && sessionIdRef.current) {
+              handoverRef.current = true;
+              connect(sessionIdRef.current, true).catch(() => {
+                handoverRef.current = false; // if the old one is closed later, normal reconnect takes over
+              });
+            }
+            break;
           case "info":
             showInfo(msg.message);
             break;
@@ -201,6 +232,10 @@ export function useCopilotSession(token: string | undefined) {
         }
       };
       ws.onclose = (e) => {
+        if (handover && !socketReady) {
+          handoverRef.current = false; // the fresh connection never became ready
+          return;
+        }
         if (wsRef.current !== ws) return; // an old socket, already replaced
         wsRef.current = null;
         const wasReady = readyRef.current;

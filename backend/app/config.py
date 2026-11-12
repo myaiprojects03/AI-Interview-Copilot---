@@ -14,6 +14,9 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     frontend_origin: str = "http://localhost:3000"
+    # Hosts that cut long connections (Vercel closes them at 300 s): after this many seconds the
+    # server asks the browser, at a quiet moment, to switch to a fresh connection. 0 = never.
+    session_rotate_s: int = 0
 
     # Provider selection (swappable by config)
     stt_provider: str = "assemblyai"    # or "deepgram" (both: free signup credit)

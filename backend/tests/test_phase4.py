@@ -385,3 +385,47 @@ def test_hosted_postgres_connection_strings_work_as_shown():
     assert normalize_dsn(neon) == "postgresql://app:pw@ep-cool-1234.us-east-1.aws.neon.tech/neondb?sslmode=require"
     local = "postgresql://copilot:copilot@localhost:5432/copilot"
     assert normalize_dsn(local) == local
+
+
+# ---------- hosts that cut long connections (Vercel: 300 s) ----------
+def test_server_asks_for_a_fresh_connection_at_a_quiet_moment_and_the_handover_keeps_one_record(monkeypatch, stores):
+    _, history = stores
+    monkeypatch.setattr(get_settings(), "session_rotate_s", 1)
+    monkeypatch.setattr(copilot_session, "ROTATE_QUIET_S", 0.2)
+    monkeypatch.setattr(copilot_session, "get_stt", lambda s: FakeSTT())
+    monkeypatch.setattr(copilot_session, "get_llm", lambda s: FakeLLM())
+    client = TestClient(app)
+    with client.websocket_connect("/ws/session") as old:
+        sid = _start(old)["session_id"]
+        msgs = _drain_until(old, lambda m: m["type"] == "rotate")
+        assert msgs[-1] == {"type": "rotate"}
+        # The browser opens the fresh connection while the old one is still open...
+        with client.websocket_connect("/ws/session") as new:
+            ready = _start(new, resume=sid)
+            assert ready["session_id"] == sid and ready["resumed"] is True
+            _end(old)  # ...then closes the old one
+            assert history.sessions[sid]["summary"].ended_at is None  # still live on the new connection
+            _end(new)
+    assert _wait(lambda: history.sessions[sid]["summary"].ended_at is not None)
+    assert len(history.sessions) == 1
+
+
+def test_no_rotation_while_an_answer_is_being_written(monkeypatch, stores):
+    monkeypatch.setattr(get_settings(), "session_rotate_s", 1)
+    monkeypatch.setattr(copilot_session, "ROTATE_QUIET_S", 0.2)
+    monkeypatch.setattr(copilot_session, "get_stt", lambda s: FakeSTT({
+        "interviewer": [("Tell me about a time you led a team?", True)]}))
+    monkeypatch.setattr(copilot_session, "get_llm", lambda s: FakeLLM(tokens=["word "] * 40, token_delay=0.05))
+    with TestClient(app).websocket_connect("/ws/session") as ws:
+        _start(ws)
+        ws.send_bytes(bytes([0]) + b"\x00" * 3200)
+        msgs = _drain_until(ws, lambda m: m["type"] == "rotate")
+        kinds = [m["type"] for m in msgs]
+        assert "answer_done" in kinds and kinds.index("answer_done") < kinds.index("rotate")
+        _end(ws)
+
+
+def test_no_rotation_by_default(monkeypatch, stores):
+    monkeypatch.setattr(copilot_session, "get_stt", lambda s: FakeSTT())
+    monkeypatch.setattr(copilot_session, "get_llm", lambda s: FakeLLM())
+    assert get_settings().session_rotate_s == 0
